@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Group Tabs</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;padding:12px;width:360px}
+    button{display:block;margin-bottom:8px}
+    h3{margin:8px 0 4px}
+    ul{margin:0 0 8px 16px;padding:0}
+    li{margin:4px 0}
+    a{color:#06c;text-decoration:none}
+  </style>
+</head>
+<body>
+  <button id="groupBtn">Group Tabs</button>
+  <button id="applyBtn">Apply Groups (test)</button>
+  <div id="groups"></div>
+
+  <hr />
+  <h3>Settings</h3>
+  <div>
+    <label><input type="radio" name="autoMode" id="auto-manual" value="manual"> Manual (no auto)</label><br>
+    <label><input type="radio" name="autoMode" id="auto-onchange" value="onchange"> Auto on tab create/update</label><br>
+    <label><input type="radio" name="autoMode" id="auto-periodic" value="periodic"> Periodic (minutes)</label>
+    <input type="number" id="period-minutes" min="1" value="15" style="width:80px;margin-left:8px" />
+  </div>
+
+  <div style="margin-top:8px">
+    <label for="includeList">Include domains (one per line):</label>
+    <textarea id="includeList" rows="3" style="width:100%"></textarea>
+  </div>
+  <div style="margin-top:8px">
+    <label for="excludeList">Exclude domains (one per line):</label>
+    <textarea id="excludeList" rows="3" style="width:100%"></textarea>
+  </div>
+  <div style="margin-top:8px">
+    <button id="saveSettings">Save Settings</button>
+    <span id="saveStatus" style="margin-left:8px;color:#070"></span>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
