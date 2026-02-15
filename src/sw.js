@@ -16,6 +16,14 @@ function getRegisteredDomain(hostname) {
 	return lastTwo;
 }
 
+function formatDomainForDisplay(domain) {
+	if (domain === 'unknown') return 'Unknown';
+	const parts = domain.split('.');
+	if (parts.length === 0) return domain;
+	const mainPart = parts[0];
+	return mainPart.charAt(0).toUpperCase() + mainPart.slice(1).toLowerCase();
+}
+
 const storageGet = (keys) => new Promise((res) => chrome.storage.sync.get(keys, res));
 const storageSet = (obj) => new Promise((res) => chrome.storage.sync.set(obj, res));
 
@@ -109,7 +117,8 @@ async function groupAllTabs() {
 							}
 							try {
 								const color = colorForDomain(domain);
-								chrome.tabGroups.update(groupId, { title: domain, color });
+							const displayName = formatDomainForDisplay(domain);
+							chrome.tabGroups.update(groupId, { title: displayName, color });
 								// update runtime map and persistent cache
 								if (!groupsByWindow.has(winId)) groupsByWindow.set(winId, new Map());
 								groupsByWindow.get(winId).set(titleKey, groupId);

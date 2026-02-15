@@ -11,3 +11,14 @@ export function getRegisteredDomain(hostname) {
   if (secondLevelTLDs.has(lastTwo)) return lastThree;
   return lastTwo;
 }
+
+// Format domain for tab group display (domain without extension, first letter capitalized)
+export function formatDomainForDisplay(domain) {
+  if (domain === 'unknown') return 'Unknown';
+  // Extract the domain part (before the TLD)
+  const parts = domain.split('.');
+  if (parts.length === 0) return domain;
+  // Take the first part and capitalize
+  const mainPart = parts[0];
+  return mainPart.charAt(0).toUpperCase() + mainPart.slice(1).toLowerCase();
+}

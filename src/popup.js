@@ -1,4 +1,4 @@
-import { getRegisteredDomain } from './utils.js';
+import { getRegisteredDomain, formatDomainForDisplay } from './utils.js';
 
 const groupBtn = document.getElementById('groupBtn');
 const applyBtn = document.getElementById('applyBtn');
@@ -101,7 +101,8 @@ function renderGroups(groups) {
   const entries = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
   for (const [domain, tabs] of entries) {
     const h = document.createElement('h3');
-    h.textContent = `${domain} (${tabs.length})`;
+    const displayName = formatDomainForDisplay(domain);
+    h.textContent = `${displayName} (${tabs.length})`;
     groupsEl.appendChild(h);
     const ul = document.createElement('ul');
     for (const t of tabs) {
