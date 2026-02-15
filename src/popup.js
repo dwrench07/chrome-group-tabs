@@ -12,22 +12,34 @@ const periodEl = document.getElementById('period-minutes');
 const autoManual = document.getElementById('auto-manual');
 const autoOnChange = document.getElementById('auto-onchange');
 const autoPeriodic = document.getElementById('auto-periodic');
+const subdomainListEl = document.getElementById('subdomainList');
 
 groupBtn.addEventListener('click', async () => {
   groupBtn.disabled = true;
   groupsEl.textContent = 'Working...';
+  
+  // Load subdomain list from settings
+  const settings = await new Promise((res) => chrome.storage.sync.get({ subdomainList: '' }, res));
+  const subdomainRaw = (settings.subdomainList || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  const subdomainSet = new Set(subdomainRaw);
+  
   const tabs = await chrome.tabs.query({});
   const groups = {};
   for (const t of tabs) {
+    if (t.pinned) continue; // Skip pinned tabs to match service worker behavior
     let domain = 'unknown';
+    let hostname = 'unknown';
     try {
       const url = new URL(t.url || '');
-      domain = getRegisteredDomain(url.hostname);
+      hostname = url.hostname;
+      domain = getRegisteredDomain(hostname);
     } catch (e) {
       domain = 'unknown';
     }
-    if (!groups[domain]) groups[domain] = [];
-    groups[domain].push(t);
+    // Use hostname if domain is in subdomain list, otherwise use domain
+    const groupKey = subdomainSet.has(domain) ? hostname : domain;
+    if (!groups[groupKey]) groups[groupKey] = [];
+    groups[groupKey].push(t);
   }
   renderGroups(groups);
   groupBtn.disabled = false;
@@ -53,14 +65,15 @@ applyBtn.addEventListener('click', async () => {
 
 // Settings load/save
 async function loadSettings() {
-  const data = await new Promise((res) => chrome.storage.sync.get({ autoMode: 'manual', periodMinutes: 15, includeList: '', excludeList: '' }, res));
-  const { autoMode, periodMinutes, includeList, excludeList } = data;
+  const data = await new Promise((res) => chrome.storage.sync.get({ autoMode: 'manual', periodMinutes: 15, includeList: '', excludeList: '', subdomainList: '' }, res));
+  const { autoMode, periodMinutes, includeList, excludeList, subdomainList } = data;
   if (autoMode === 'manual') autoManual.checked = true;
   else if (autoMode === 'onchange') autoOnChange.checked = true;
   else if (autoMode === 'periodic') autoPeriodic.checked = true;
   periodEl.value = periodMinutes || 15;
   includeListEl.value = includeList || '';
   excludeListEl.value = excludeList || '';
+  subdomainListEl.value = subdomainList || '';
 }
 
 async function saveSettingsHandler() {
@@ -68,8 +81,9 @@ async function saveSettingsHandler() {
   const minutes = parseInt(periodEl.value, 10) || 15;
   const includeList = includeListEl.value || '';
   const excludeList = excludeListEl.value || '';
+  const subdomainList = subdomainListEl.value || '';
   try {
-    await new Promise((res) => chrome.storage.sync.set({ autoMode: mode, periodMinutes: minutes, includeList, excludeList }, res));
+    await new Promise((res) => chrome.storage.sync.set({ autoMode: mode, periodMinutes: minutes, includeList, excludeList, subdomainList }, res));
     saveStatus.style.color = '#070';
     saveStatus.textContent = 'Saved';
     setTimeout(() => (saveStatus.textContent = ''), 1500);

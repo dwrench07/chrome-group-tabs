@@ -18,7 +18,18 @@ export function formatDomainForDisplay(domain) {
   // Extract the domain part (before the TLD)
   const parts = domain.split('.');
   if (parts.length === 0) return domain;
-  // Take the first part and capitalize
+  // Take the first part (subdomain if present) and capitalize
   const mainPart = parts[0];
   return mainPart.charAt(0).toUpperCase() + mainPart.slice(1).toLowerCase();
+}
+
+// Get the hostname to use for grouping (either registered domain or full hostname)
+export function getGroupKey(hostname, groupBySubdomain) {
+  if (groupBySubdomain) {
+    // Group by full hostname to separate subdomains
+    return hostname || 'unknown';
+  } else {
+    // Group by registered domain (default behavior)
+    return getRegisteredDomain(hostname);
+  }
 }

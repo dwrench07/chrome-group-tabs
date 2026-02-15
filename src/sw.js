@@ -29,14 +29,16 @@ const storageSet = (obj) => new Promise((res) => chrome.storage.sync.set(obj, re
 
 async function groupAllTabs() {
 	try {
-		const settings = await storageGet({ includeList: '', excludeList: '' });
+		const settings = await storageGet({ includeList: '', excludeList: '', subdomainList: '' });
 		const includeRaw = (settings.includeList || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
 		const excludeRaw = (settings.excludeList || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+		const subdomainRaw = (settings.subdomainList || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
 		const includeSet = new Set(includeRaw);
 		const excludeSet = new Set(excludeRaw);
+		const subdomainSet = new Set(subdomainRaw);
 
 		const tabs = await new Promise((res) => chrome.tabs.query({}, res));
-		// map: domain -> windowId -> [tabIds]
+		// map: groupKey -> windowId -> [tabIds]
 		const map = new Map();
 		for (const t of tabs) {
 			if (!t.url || typeof t.url !== 'string') continue;
@@ -52,9 +54,11 @@ async function groupAllTabs() {
 			if (!domain) continue;
 			if (excludeSet.has(domain)) continue;
 			if (includeSet.size > 0 && !includeSet.has(domain)) continue;
+			// Use hostname if domain is in subdomain list, otherwise use domain
+			const groupKey = subdomainSet.has(domain) ? hostname : domain;
 			const win = t.windowId || 0;
-			if (!map.has(domain)) map.set(domain, new Map());
-			const winMap = map.get(domain);
+			if (!map.has(groupKey)) map.set(groupKey, new Map());
+			const winMap = map.get(groupKey);
 			if (!winMap.has(win)) winMap.set(win, []);
 			winMap.get(win).push(t.id);
 		}
@@ -82,12 +86,14 @@ async function groupAllTabs() {
 			return colors[h % colors.length];
 		}
 
-		// For each domain with at least 2 tabs, group them (per window)
-		for (const [domain, winMap] of map.entries()) {
+		// For each group key with at least 2 tabs, group them (per window)
+		for (const [groupKey, winMap] of map.entries()) {
+			// Extract the domain from groupKey (works whether it's a subdomain or domain)
+			const domain = getRegisteredDomain(groupKey);
 			for (const [winId, tabIds] of winMap.entries()) {
 				if (!tabIds || tabIds.length < 2) continue;
 				try {
-					const titleKey = domain.toLowerCase();
+					const titleKey = groupKey.toLowerCase();
 					const winGroups = groupsByWindow.get(winId) || new Map();
 					let existingGroupId = winGroups.get(titleKey);
 
@@ -99,26 +105,29 @@ async function groupAllTabs() {
 
 					if (existingGroupId != null) {
 						// add tabs to the existing group
-						console.debug('groupAllTabs: adding to existing group', { domain, winId, groupId: existingGroupId, tabIds });
+						console.debug('groupAllTabs: adding to existing group', { groupKey, winId, groupId: existingGroupId, tabIds });
 						chrome.tabs.group({ groupId: existingGroupId, tabIds }, (groupId) => {
 							if (chrome.runtime.lastError) {
-								console.error('tabs.group add error', chrome.runtime.lastError, { domain, winId, tabIds });
+								console.error('tabs.group add error', chrome.runtime.lastError, { groupKey, winId, tabIds });
 								return;
 							}
-							console.log('Added to existing group', domain, 'gid', groupId, 'window', winId);
+							console.log('Added to existing group', groupKey, 'gid', groupId, 'window', winId);
 						});
 					} else {
-						// create a new group and name it with the domain
-						console.debug('groupAllTabs: creating new group', { domain, winId, tabIds });
+						// create a new group and name it with the group key
+						console.debug('groupAllTabs: creating new group', { groupKey, winId, tabIds });
 						chrome.tabs.group({ tabIds }, (groupId) => {
 							if (chrome.runtime.lastError) {
-								console.error('tabs.group create error', chrome.runtime.lastError, { domain, winId, tabIds });
+								console.error('tabs.group create error', chrome.runtime.lastError, { groupKey, winId, tabIds });
 								return;
 							}
 							try {
-								const color = colorForDomain(domain);
-							const displayName = formatDomainForDisplay(domain);
-							chrome.tabGroups.update(groupId, { title: displayName, color });
+								// Use the domain for color consistency (so all subdomains of same domain get same color)
+								const colorKey = subdomainSet.has(domain) ? domain : groupKey;
+								const color = colorForDomain(colorKey);
+								const displayName = formatDomainForDisplay(groupKey);
+								console.log('Updating group', groupKey, 'with color', color, 'displayName', displayName);
+								chrome.tabGroups.update(groupId, { title: displayName, color });
 								// update runtime map and persistent cache
 								if (!groupsByWindow.has(winId)) groupsByWindow.set(winId, new Map());
 								groupsByWindow.get(winId).set(titleKey, groupId);
@@ -126,14 +135,14 @@ async function groupAllTabs() {
 								domainGroupMap[winId] = domainGroupMap[winId] || {};
 								domainGroupMap[winId][titleKey] = groupId;
 								storageSet({ domainGroupMap }).catch(() => {});
-								console.log('Created group', domain, 'gid', groupId, 'window', winId);
+								console.log('Created group', groupKey, 'gid', groupId, 'window', winId);
 							} catch (e) {
-								console.error('tabGroups.update error', e, { domain, winId, groupId });
+								console.error('tabGroups.update error', e, { groupKey, winId, groupId });
 							}
 						});
 					}
 				} catch (e) {
-					console.error('groupAllTabs exception', e, { domain, winId });
+					console.error('groupAllTabs exception', e, { groupKey, winId });
 				}
 			}
 		}
